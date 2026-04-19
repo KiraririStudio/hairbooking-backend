@@ -11,7 +11,7 @@ app = FastAPI()
 # ===== CORS =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://brain0820.github.io"],
+    allow_origins=["https://kirariristudio.github.io"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
