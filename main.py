@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import sqlite3
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI()
 app.add_middleware(
