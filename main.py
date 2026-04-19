@@ -49,6 +49,14 @@ class Reservation(BaseModel):
     date: str
     time: str
 
+
+@app.get("/_debug/db")
+def debug_db():
+    return {
+        "DATABASE_URL": os.environ.get("DATABASE_URL"),
+        "DB_TYPE": "postgresql" if os.environ.get("DATABASE_URL", "").startswith("postgresql") else "sqlite"
+    }
+
 @app.post("/reserve")
 def reserve(r: Reservation):
     conn = get_db()
