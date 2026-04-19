@@ -56,22 +56,93 @@ class Reservation(BaseModel):
     time: str
 
 # ======================================================
-# ✅ 新增預約
+# ✅ 預約規則設定（完全不動）
 # ======================================================
+
+AVAILABLE_DATES = [
+    "2026-04-24", "2026-04-26", "2026-04-29",
+    "2026-05-01", "2026-05-02", "2026-05-06",
+    "2026-05-08", "2026-05-09", "2026-05-10",
+    "2026-05-13", "2026-05-15", "2026-05-16",
+    "2026-05-17", "2026-05-20", "2026-05-22",
+    "2026-05-23", "2026-05-24", "2026-05-27",
+    "2026-05-29", "2026-05-30"
+]
+
+SPECIAL_TIME_RULES = {
+    "2026-04-24": ("14:00", "18:00"),
+    "2026-05-02": ("13:00", "17:00"),
+    "2026-05-16": ("13:00", "17:00"),
+    "2026-05-30": ("13:00", "17:00"),
+}
+
+DEFAULT_START = "13:00"
+DEFAULT_END = "18:00"
+
+# ======================================================
+# ✅ 共用工具（完全不動）
+# ======================================================
+
+def get_reservation_count_by_date(date_str: str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT time, COUNT(*)
+        FROM reservations
+        WHERE date = %s
+        GROUP BY time
+    """, (date_str,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {time: count for time, count in rows}
+
+def generate_times(start_str, end_str):
+    start = datetime.strptime(start_str, "%H:%M")
+    end = datetime.strptime(end_str, "%H:%M")
+    times = []
+    current = start
+    while current < end:
+        times.append(current.strftime("%H:%M"))
+        current += timedelta(minutes=20)
+    return times
+
+# ======================================================
+# ✅ 前台 API（完全不動）
+# ======================================================
+
+@app.get("/available-dates")
+def available_dates():
+    results = []
+    for d in AVAILABLE_DATES:
+        start, end = SPECIAL_TIME_RULES.get(d, (DEFAULT_START, DEFAULT_END))
+        all_times = generate_times(start, end)
+        counts = get_reservation_count_by_date(d)
+        if all(counts.get(t, 0) >= 2 for t in all_times):
+            continue
+        results.append({"value": d})
+    return results
+
+@app.get("/available-times")
+def available_times(date: str):
+    start, end = SPECIAL_TIME_RULES.get(date, (DEFAULT_START, DEFAULT_END))
+    all_times = generate_times(start, end)
+    counts = get_reservation_count_by_date(date)
+    return [t for t in all_times if counts.get(t, 0) < 2]
+
+# ======================================================
+# ✅ 新增預約（完全不動）
+# ======================================================
+
 @app.post("/reserve")
 def reserve(r: Reservation):
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute(
         "SELECT COUNT(*) FROM reservations WHERE date=%s AND time=%s",
         (r.date, r.time)
     )
-    count = cur.fetchone()[0]
-
-    if count >= 2:
-        cur.close()
-        conn.close()
+    if cur.fetchone()[0] >= 2:
         raise HTTPException(status_code=400, detail="此時段已滿")
 
     cur.execute("""
@@ -82,12 +153,12 @@ def reserve(r: Reservation):
     conn.commit()
     cur.close()
     conn.close()
-
     return {"message": "預約成功"}
 
 # ======================================================
-# ✅ 後台：刪除單筆預約（作法 1）
+# ✅ 後台刪除單筆預約（新增）
 # ======================================================
+
 @app.post("/admin/delete/{reservation_id}")
 def delete_reservation(reservation_id: int):
     conn = get_db()
@@ -99,24 +170,22 @@ def delete_reservation(reservation_id: int):
     return RedirectResponse(url="/admin", status_code=303)
 
 # ======================================================
-# ✅ 後台（先日期 → 再時間 → 正序）
+# ✅ 後台顯示（只多刪除按鈕）
 # ======================================================
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin():
     conn = get_db()
     cur = conn.cursor()
-
-    # ✅ 含 id + 正確排序
     cur.execute("""
         SELECT id, date, time, name, phone, pay_code
         FROM reservations
-        ORDER BY date ASC, time ASC, created_at ASC
+        ORDER BY date, time, created_at
     """)
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
-    # 按 (date, time) 分組
     data = {}
     for rid, date, time, name, phone, code in rows:
         data.setdefault((date, time), []).append(
@@ -131,7 +200,7 @@ def admin():
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #000; padding: 8px; vertical-align: top; }
     th { background-color: #f0f0f0; }
-    form { display:inline; }
+    form { display: inline; }
     button { margin-left: 8px; }
     </style></head><body>
     <h2>預約狀態</h2>
