@@ -55,8 +55,9 @@ class Reservation(BaseModel):
     date: str
     time: str
 
+
 # ======================================================
-# ✅ 預約規則設定（完全不動）
+# ✅ 預約規則設定
 # ======================================================
 
 AVAILABLE_DATES = [
@@ -79,8 +80,9 @@ SPECIAL_TIME_RULES = {
 DEFAULT_START = "13:00"
 DEFAULT_END = "18:00"
 
+
 # ======================================================
-# ✅ 共用工具（完全不動）
+# ✅ 共用工具
 # ======================================================
 
 def get_reservation_count_by_date(date_str: str):
@@ -107,10 +109,12 @@ def generate_times(start_str, end_str):
         current += timedelta(minutes=20)
     return times
 
+
 # ======================================================
-# ✅ 前台 API（完全不動）
+# ✅ 前台 API
 # ======================================================
 
+# 可預約日期（整天滿就不顯示）
 @app.get("/available-dates")
 def available_dates():
     results = []
@@ -118,31 +122,42 @@ def available_dates():
         start, end = SPECIAL_TIME_RULES.get(d, (DEFAULT_START, DEFAULT_END))
         all_times = generate_times(start, end)
         counts = get_reservation_count_by_date(d)
-        if all(counts.get(t, 0) >= 2 for t in all_times):
+
+        # ✅ 只要每個時段都 >= 1 人，整天就不顯示
+        if all(counts.get(t, 0) >= 1 for t in all_times):
             continue
+
         results.append({"value": d})
     return results
 
+
+# 可預約時間（只要有人就不顯示）
 @app.get("/available-times")
 def available_times(date: str):
     start, end = SPECIAL_TIME_RULES.get(date, (DEFAULT_START, DEFAULT_END))
     all_times = generate_times(start, end)
     counts = get_reservation_count_by_date(date)
-    return [t for t in all_times if counts.get(t, 0) < 2]
+
+    # ✅ 只顯示 아직 沒人預約的時段
+    return [t for t in all_times if counts.get(t, 0) < 1]
+
 
 # ======================================================
-# ✅ 新增預約（完全不動）
+# ✅ 新增預約（每時段只允許 1 人）
 # ======================================================
 
 @app.post("/reserve")
 def reserve(r: Reservation):
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute(
         "SELECT COUNT(*) FROM reservations WHERE date=%s AND time=%s",
         (r.date, r.time)
     )
-    if cur.fetchone()[0] >= 2:
+
+    # ✅ 只要已有 1 人就拒絕
+    if cur.fetchone()[0] >= 1:
         raise HTTPException(status_code=400, detail="此時段已滿")
 
     cur.execute("""
@@ -153,10 +168,12 @@ def reserve(r: Reservation):
     conn.commit()
     cur.close()
     conn.close()
+
     return {"message": "預約成功"}
 
+
 # ======================================================
-# ✅ 後台刪除單筆預約（新增）
+# ✅ 後台刪除單筆預約
 # ======================================================
 
 @app.post("/admin/delete/{reservation_id}")
@@ -169,8 +186,9 @@ def delete_reservation(reservation_id: int):
     conn.close()
     return RedirectResponse(url="/admin", status_code=303)
 
+
 # ======================================================
-# ✅ 後台顯示（只多刪除按鈕）
+# ✅ 後台顯示
 # ======================================================
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -215,7 +233,7 @@ def admin():
 
     for (date, time), people in data.items():
         html += f"<tr><td>{date}</td><td>{time}</td>"
-        html += f"<td>{len(people)} / 2</td><td>"
+        html += f"<td>{len(people)} / 1</td><td>"
 
         for idx, p in enumerate(people, 1):
             html += f"""
@@ -223,8 +241,7 @@ def admin():
             <form method="post" action="/admin/delete/{p['id']}"
                   onsubmit="return confirm('確定要刪除這筆預約嗎？');">
                 <button type="submit">刪除</button>
-            </form>
-            <br>
+            </form><br>
             """
 
         html += "</td></tr>"
