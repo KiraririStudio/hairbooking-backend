@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import psycopg2
 import os
 
@@ -80,6 +81,8 @@ SPECIAL_TIME_RULES = {
 DEFAULT_START = "13:00"
 DEFAULT_END = "18:00"
 
+TZ = ZoneInfo("Asia/Taipei")
+
 
 # ======================================================
 # ✅ 共用工具
@@ -114,31 +117,49 @@ def generate_times(start_str, end_str):
 # ✅ 前台 API
 # ======================================================
 
-# 可預約日期（整天滿就不顯示）
 @app.get("/available-dates")
 def available_dates():
+    now = datetime.now(TZ)
+    today_str = now.strftime("%Y-%m-%d")
+
     results = []
     for d in AVAILABLE_DATES:
+        if d < today_str:
+            continue
+
         start, end = SPECIAL_TIME_RULES.get(d, (DEFAULT_START, DEFAULT_END))
         all_times = generate_times(start, end)
+
+        if d == today_str:
+            current_time_str = now.strftime("%H:%M")
+            all_times = [t for t in all_times if t > current_time_str]
+
+            if not all_times:
+                continue
+
         counts = get_reservation_count_by_date(d)
 
-        # ✅ 只要每個時段都 >= 1 人，整天就不顯示
         if all(counts.get(t, 0) >= 1 for t in all_times):
             continue
 
         results.append({"value": d})
+
     return results
 
 
-# 可預約時間（只要有人就不顯示）
 @app.get("/available-times")
 def available_times(date: str):
+    now = datetime.now(TZ)
+    today_str = now.strftime("%Y-%m-%d")
+
     start, end = SPECIAL_TIME_RULES.get(date, (DEFAULT_START, DEFAULT_END))
     all_times = generate_times(start, end)
-    counts = get_reservation_count_by_date(date)
 
-    # ✅ 只顯示 아직 沒人預約的時段
+    if date == today_str:
+        current_time_str = now.strftime("%H:%M")
+        all_times = [t for t in all_times if t > current_time_str]
+
+    counts = get_reservation_count_by_date(date)
     return [t for t in all_times if counts.get(t, 0) < 1]
 
 
@@ -156,7 +177,6 @@ def reserve(r: Reservation):
         (r.date, r.time)
     )
 
-    # ✅ 只要已有 1 人就拒絕
     if cur.fetchone()[0] >= 1:
         raise HTTPException(status_code=400, detail="此時段已滿")
 
@@ -238,8 +258,7 @@ def admin():
         for idx, p in enumerate(people, 1):
             html += f"""
             {idx}. {p['name']}｜{p['phone']}｜{p['code']}
-            <form method="post" action="/admin/delete/{p['id']}"
-                  onsubmit="return confirm('確定要刪除這筆預約嗎？');">
+            /admin/delete/{p['id']}">
                 <button type="submit">刪除</button>
             </form><br>
             """
