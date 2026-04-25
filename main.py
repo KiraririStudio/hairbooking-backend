@@ -256,14 +256,14 @@ def admin():
         html += f"<td>{len(people)} / 1</td><td>"
 
         
-    for idx, p in enumerate(people, 1):
-        html += f"""
-        {idx}. {p['name']}｜{p['phone']}｜{p['code']}
-        <form method="post" action="/admin/delete/{p['id']}"
-              onsubmit="return confirm('確定要刪除這筆預約嗎？');">
-            <button type="submit">刪除</button>
-        </form><br>
-        """
+        for idx, p in enumerate(people, 1):
+            html += f"""
+            {idx}. {p['name']}｜{p['phone']}｜{p['code']}
+            <form method="post" action="/admin/delete/{p['id']}"
+                  onsubmit="return confirm('確定要刪除這筆預約嗎？');">
+                <button type="submit">刪除</button>
+            </form><br>
+            """
 
 
         html += "</td></tr>"
