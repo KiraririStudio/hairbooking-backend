@@ -60,7 +60,6 @@ class Reservation(BaseModel):
 # ======================================================
 # ✅ 預約規則設定
 # ======================================================
-
 AVAILABLE_DATES = [
     "2026-04-24", "2026-04-26", "2026-04-29",
     "2026-05-01", "2026-05-02", "2026-05-06",
@@ -68,15 +67,26 @@ AVAILABLE_DATES = [
     "2026-05-13", "2026-05-15", "2026-05-16",
     "2026-05-17", "2026-05-20", "2026-05-22",
     "2026-05-23", "2026-05-24", "2026-05-27",
-    "2026-05-29", "2026-05-30"
+    "2026-05-29", "2026-05-30",
+
+    # ✅ 新增 6 月
+    "2026-06-03", "2026-06-05", "2026-06-06",
+    "2026-06-07", "2026-06-10", "2026-06-12",
+    "2026-06-13", "2026-06-14"
 ]
+
+
 
 SPECIAL_TIME_RULES = {
     "2026-04-24": ("14:00", "18:00"),
     "2026-05-02": ("13:00", "17:00"),
     "2026-05-16": ("13:00", "17:00"),
     "2026-05-30": ("13:00", "17:00"),
+
+    # ✅ 新增
+    "2026-06-06": ("13:00", "17:00"),
 }
+
 
 DEFAULT_START = "13:00"
 DEFAULT_END = "18:00"
@@ -212,14 +222,28 @@ def delete_reservation(reservation_id: int):
 # ======================================================
 
 @app.get("/admin", response_class=HTMLResponse)
-def admin():
+def admin(all: bool = Query(False)):
+    now = datetime.now(TZ)
+    today_str = now.strftime("%Y-%m-%d")
+    current_time_str = now.strftime("%H:%M")
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT id, date, time, name, phone, pay_code
-        FROM reservations
-        ORDER BY date, time, created_at
-    """)
+    
+    if not all:
+        cur.execute("""
+            SELECT id, date, time, name, phone, pay_code
+            FROM reservations
+            WHERE (date > %s)
+               OR (date = %s AND time > %s)
+            ORDER BY date, time, created_at
+        """, (today_str, today_str, current_time_str))
+    else:
+        cur.execute("""
+            SELECT id, date, time, name, phone, pay_code
+            FROM reservations
+            ORDER BY date, time, created_at
+        """)
+    
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -237,11 +261,21 @@ def admin():
     body { font-family: Arial; padding: 30px; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #000; padding: 8px; vertical-align: top; }
-    th { background-color: #f0f0f0; }
+    th {
+      background-color: #fde5c8;  /* ✅ 淡橘色 */
+    }
     form { display: inline; }
     button { margin-left: 8px; }
     </style></head><body>
+    
     <h2>預約狀態</h2>
+    <a href="/admin?all=true">
+      <button>顯示全部預約</button>
+    </a>
+    <a href="/admin">
+      <button>只顯示未來</button>
+    </a>
+
     <table>
       <tr>
         <th>日期</th>
@@ -250,16 +284,18 @@ def admin():
         <th>名單</th>
       </tr>
     """
-
+    
     for (date, time), people in data.items():
-        html += f"<tr><td>{date}</td><td>{time}</td>"
+        is_past = (date < today_str) or (date == today_str and time < current_time_str)
+        row_style = "background-color:#e8f5e9;" if is_past else ""
+        html += f"<tr style='{row_style}'><td>{date}</td><td>{time}</td>"
         html += f"<td>{len(people)} / 1</td><td>"
 
         for idx, p in enumerate(people, 1):
             html += f"""
             {idx}. {p['name']}｜{p['phone']}｜{p['code']}
             <form method="post" action="/admin/delete/{p['id']}"
-                  onsubmit="return confirm('確定要刪除這筆預約嗎？');">
+                  onsubmit="return confirm('確定要刪除這筆預約嗎？\\n\\n日期：{date}\\n時間：{time}\\n姓名：{p['name']}');">
                 <button type="submit">刪除</button>
             </form><br>
             """
