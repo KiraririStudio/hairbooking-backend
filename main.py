@@ -253,28 +253,65 @@ def admin(all: bool = Query(False)):
         data.setdefault((date, time), []).append(
             {"id": rid, "name": name, "phone": phone, "code": code}
         )
+    
+    if all:
+        btn_all = "style='background:#fde5c8;'"
+        btn_future = ""
+    else:
+        btn_all = ""
+        btn_future = "style='background:#fde
 
     html = """
     <html><head><meta charset="utf-8">
     <title>預約後台</title>
     <style>
     body { font-family: Arial; padding: 30px; }
-    table { border-collapse: collapse; width: 100%; }
+    
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;   /* ✅ 再拉開一點 */
+    }
+
     th, td { border: 1px solid #000; padding: 8px; vertical-align: top; }
     th {
       background-color: #fde5c8;  /* ✅ 淡橘色 */
     }
     form { display: inline; }
     button { margin-left: 8px; }
+    .toolbar {
+      margin: 16px 0 20px 0;   /* ✅ 和 table 拉開距離 */
+    }
+    
+    .toolbar a {
+      text-decoration: none;
+      margin-right: 8px;
+    }
+    
+    .btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #d0c4b6;
+      background: #fff6ee;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .btn:hover {
+      background: #fde5c8;
+    }
     </style></head><body>
     
     <h2>預約狀態</h2>
-    <a href="/admin?all=true">
-      <button>顯示全部預約</button>
-    </a>
-    <a href="/admin">
-      <button>只顯示未來</button>
-    </a>
+    
+    <div class="toolbar">
+      <a href="/admin?all=true">
+        <button class="btn" {btn_all}>全部預約</button>
+      </a>
+      <a href="/admin">
+        <button class="btn" {btn_future}>未來預約</button>
+      </a>
+    </div>
 
     <table>
       <tr>
