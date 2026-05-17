@@ -253,14 +253,14 @@ def admin(all: bool = Query(False)):
         data.setdefault((date, time), []).append(
             {"id": rid, "name": name, "phone": phone, "code": code}
         )
-    
+
     if all:
         btn_all = "style='background:#fde5c8;'"
         btn_future = ""
     else:
         btn_all = ""
-        btn_future = "style='background:#fde
-
+        btn_future = "style='background:#fde5c8;'"
+        
     html = """
     <html><head><meta charset="utf-8">
     <title>預約後台</title>
